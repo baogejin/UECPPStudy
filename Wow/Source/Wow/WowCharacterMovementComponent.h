@@ -14,6 +14,4 @@ class WOW_API UWowCharacterMovementComponent : public UCharacterMovementComponen
 {
 	GENERATED_BODY()
 public:
-	/** Perform rotation over deltaTime */
-	virtual void PhysicsRotation(float DeltaTime) override;
 };
