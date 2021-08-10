@@ -54,6 +54,8 @@ protected:
 	// End of APawn interface
 
 public:
+	void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+
 	/** Returns CameraBoom subobject **/
 	FORCEINLINE class USpringArmComponent* GetCameraBoom() const { return CameraBoom; }
 	/** Returns FollowCamera subobject **/
@@ -78,13 +80,22 @@ public:
 	float MouseX;
 
 	UPROPERTY()
-    float MouseY;
+	float MouseY;
 
 	UPROPERTY()
 	float ForwardInput;
 
 	UPROPERTY()
 	float RightInput;
+
+	UPROPERTY(ReplicatedUsing = OnRep_ActorRotation)
+	FRotator CurrentRotation;
+
+	UFUNCTION()
+	void OnRep_ActorRotation();
+
+	UFUNCTION()
+	void OnCurrentRotationUpdate();
 
 	UFUNCTION(BlueprintCallable)
 	void OnTick(float deltaTime);
@@ -93,10 +104,5 @@ public:
 	void WowActorRotate(const FRotator& NewRotation);
 	void WowActorRotate_Implementation(const FRotator& NewRotation);
 	bool WowActorRotate_Validate(const FRotator& NewRotation);
-
-	UFUNCTION(NetMulticast, Reliable, WithValidation)
-	void DoWowActorRotate(const FRotator& NewRotation);
-	void DoWowActorRotate_Implementation(const FRotator& NewRotation);
-	bool DoWowActorRotate_Validate(const FRotator& NewRotation);
 };
 

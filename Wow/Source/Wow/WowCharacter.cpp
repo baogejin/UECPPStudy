@@ -9,13 +9,12 @@
 #include "GameFramework/Controller.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "Math/UnrealMathUtility.h"
-#include "WowCharacterMovementComponent.h"
+#include <Net/UnrealNetwork.h>
 
 //////////////////////////////////////////////////////////////////////////
 // AWowCharacter
 
-AWowCharacter::AWowCharacter(const FObjectInitializer& ObjectInitializer):
-	Super(ObjectInitializer.SetDefaultSubobjectClass<UWowCharacterMovementComponent>(ACharacter::CharacterMovementComponentName))
+AWowCharacter::AWowCharacter(const FObjectInitializer& ObjectInitializer)
 {
 	// Set size for collision capsule
 	GetCapsuleComponent()->InitCapsuleSize(42.f, 96.0f);
@@ -114,6 +113,10 @@ void AWowCharacter::MoveForward(float Value)
 
 void AWowCharacter::MoveRight(float Value)
 {
+	if (Value == 0)
+	{
+		return;
+	}
 	if (bRightMouse)
 	{
 		RightInput = Value;
@@ -127,10 +130,14 @@ void AWowCharacter::MoveRight(float Value)
 			return;
 		}
 		FRotator r = GetActorRotation();
-		r.Yaw += Value*PC->InputYawScale;
+		r.Yaw += Value*PC->InputYawScale*2;
 		r.Pitch = 0;
 		r.Roll = 0;
-		//SetActorRotation(r);
+		if (IsLocallyControlled())
+		{
+			GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, "LocallyControlled");
+			SetActorRotation(r);
+		}
 		WowActorRotate(r);
 		if (!bLeftMouse)
 		{
@@ -210,32 +217,26 @@ void AWowCharacter::OnTick(float deltaTime)
 	{
 		PC->SetMouseLocation(MouseX, MouseY);
 	}
+	if (bLeftMouse && bRightMouse)
+	{
+		ForwardInput = 1;
+		AddPlayerMoveInput(true);
+	}
 }
 
 void AWowCharacter::OnTurn(float val)
 {
+	if (val == 0)
+	{
+		return;
+	}
 	APlayerController* const PC = CastChecked<APlayerController>(Controller);
 	if (!PC)
 	{
 		return;
 	}
-	if (bLeftMouse && bRightMouse)
-	{
-		AddControllerYawInput(val);
-		FRotator r;
-		r.Yaw = PC->GetControlRotation().Yaw;
-		r.Pitch = 0;
-		r.Roll = 0;
-		//SetActorRotation(r);
-		WowActorRotate(r);
-		ForwardInput = 1;
-		AddPlayerMoveInput(true);
-	}
-	else if (bLeftMouse)
-	{
-		AddControllerYawInput(val);
-	}
-	else if (bRightMouse)
+	
+	if (bRightMouse)
 	{
 		AddControllerYawInput(val);
 		FRotator r;
@@ -245,6 +246,10 @@ void AWowCharacter::OnTurn(float val)
 		//SetActorRotation(r);
 		WowActorRotate(r);
 		GetCharacterMovement()->MoveUpdatedComponent(FVector::ZeroVector, r, false);
+	}
+	else if (bLeftMouse)
+	{
+		AddControllerYawInput(val);
 	}
 }
 
@@ -280,7 +285,8 @@ void AWowCharacter::AddPlayerMoveInput(bool bForward)
 
 void AWowCharacter::WowActorRotate_Implementation(const FRotator& NewRotation)
 {
-	DoWowActorRotate(NewRotation);
+	CurrentRotation = NewRotation;
+	OnCurrentRotationUpdate();
 }
 
 bool AWowCharacter::WowActorRotate_Validate(const FRotator& NewRotation)
@@ -288,12 +294,24 @@ bool AWowCharacter::WowActorRotate_Validate(const FRotator& NewRotation)
 	return true;
 }
 
-void AWowCharacter::DoWowActorRotate_Implementation(const FRotator& NewRotation)
+void AWowCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
-	SetActorRotation(NewRotation);
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+
+	DOREPLIFETIME(AWowCharacter,CurrentRotation);
 }
 
-bool AWowCharacter::DoWowActorRotate_Validate(const FRotator& NewRotation)
+void AWowCharacter::OnRep_ActorRotation()
 {
-	return true;
+	OnCurrentRotationUpdate();
+}
+
+void AWowCharacter::OnCurrentRotationUpdate()
+{
+	if (!IsLocallyControlled())
+	{
+		//GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, "notLocallyControlled");
+		//GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Blue, *GetFName().ToString());
+		SetActorRotation(CurrentRotation);
+	}
 }
